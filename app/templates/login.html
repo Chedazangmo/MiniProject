@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card p-4 shadow-sm">
+            <h2 class="mb-3">Login</h2>
+            <form method="POST">
+                {{ form.hidden_tag() }}
+                <div class="mb-3">
+                    {{ form.username.label(class="form-label") }}
+                    {{ form.username(class="form-control", autofocus=True) }}
+                </div>
+                <div class="mb-3">
+                    {{ form.password.label(class="form-label") }}
+                    {{ form.password(class="form-control") }}
+                </div>
+                <div class="mb-3">
+                    {{ form.submit(class="btn btn-primary w-100") }}
+                </div>
+            </form>
+            <p class="mt-2 text-center">
+                <a href="{{ url_for('auth.register') }}">Don't have an account? Register</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
