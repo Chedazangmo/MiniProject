@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, TextAreaField, SelectField, SubmitField, PasswordField
 from wtforms.validators import DataRequired, Length, EqualTo, ValidationError
-from .models import User
+from app.models import User  # FIXED: Absolute import
 
 class TaskForm(FlaskForm):
     title = StringField('Title', validators=[DataRequired(), Length(max=100)])
