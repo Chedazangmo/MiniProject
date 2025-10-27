@@ -288,11 +288,6 @@ def jwt_info():
     <p><strong>Authentication Method:</strong> JWT Tokens (Access + Refresh)</p>
     <p><strong>Tokens:</strong> Both access and refresh tokens implemented</p>
     """
-@auth_bp.route('/debug-users')
-def debug_users():
-    from app.models import User
-    users = User.query.all()
-    return f"<h2>Total Users: {len(users)}</h2>" + "<br>".join([u.username for u in users])
 
 
 @task_bp.route('/health')
