@@ -105,6 +105,43 @@ def register():
 
     return render_template('register.html', form=form)
 
+@auth_bp.route('/api/register', methods=['POST'])
+def api_register():
+    """JSON API endpoint for user registration"""
+    print("=== API REGISTER CALLED ===")  # Debug line
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json"}), 400
+    
+    data = request.get_json()
+    print(f"Received data: {data}")  # Debug line
+    db_session = get_db_session()
+    
+    # Validate required fields
+    if not data or not data.get('username') or not data.get('password'):
+        return jsonify({"error": "Username and password are required"}), 400
+    
+    username = data.get('username')
+    password = data.get('password')
+    
+    # Check if username already exists
+    existing_user = db_session.query(User).filter_by(username=username).first()
+    if existing_user:
+        return jsonify({"error": "Username already exists"}), 400
+    
+    # Create new user (only username and password)
+    user = User(username=username)
+    user.set_password(password)
+    
+    db_session.add(user)
+    db_session.commit()
+    
+    print(f"User created: {username}")  # Debug line
+    return jsonify({
+        "message": "User registered successfully",
+        "user_id": user.id,
+        "username": user.username
+    }), 201
+
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -131,6 +168,39 @@ def login():
 
     return render_template('login.html', form=form)
 
+@auth_bp.route('/api/login', methods=['POST'])
+def api_login():
+    """JSON API endpoint for user login"""
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json"}), 400
+    
+    data = request.get_json()
+    db_session = get_db_session()
+    
+    # Validate required fields
+    if not data or not data.get('username') or not data.get('password'):
+        return jsonify({"error": "Username and password are required"}), 400
+    
+    username = data.get('username')
+    password = data.get('password')
+    
+    # Find user and verify password
+    user = db_session.query(User).filter_by(username=username).first()
+    
+    if user and user.check_password(password):
+        # Create JWT tokens
+        access_token = create_access_token(identity=user.username)
+        refresh_token = create_refresh_token(identity=user.username)
+        
+        return jsonify({
+            "message": "Login successful",
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "user_id": user.id,
+            "username": user.username
+        }), 200
+    else:
+        return jsonify({"error": "Invalid username or password"}), 401
 
 @auth_bp.route('/refresh', methods=['POST'])
 @jwt_required(refresh=True)
@@ -294,6 +364,19 @@ def debug_users():
     users = User.query.all()
     return f"<h2>Total Users: {len(users)}</h2>" + "<br>".join([u.username for u in users])
 
+@task_bp.route('/debug/routes')
+def debug_routes():
+    """Show all available routes"""
+    from flask import current_app
+    routes = []
+    for rule in current_app.url_map.iter_rules():
+        if 'static' not in str(rule):
+            routes.append({
+                'endpoint': rule.endpoint,
+                'methods': list(rule.methods),
+                'path': str(rule)
+            })
+    return jsonify(routes)
 
 @task_bp.route('/health')
 def health_check():
@@ -303,7 +386,6 @@ def health_check():
         return jsonify({
             'status': 'healthy',
             'service': 'task-manager',
-            'timestamp': datetime.utcnow().isoformat(),
             'authentication': 'jwt_with_refresh_tokens'
         }), 200
     except Exception as e:
@@ -311,3 +393,129 @@ def health_check():
             'status': 'unhealthy',
             'error': str(e)
         }), 503
+@task_bp.route('/api/tasks', methods=['GET'])
+@jwt_required()
+def api_get_tasks():
+    """JSON API endpoint to get all tasks for current user"""
+    current_user = get_jwt_identity()
+    db_session = get_db_session()
+    
+    user = db_session.query(User).filter_by(username=current_user).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    tasks = db_session.query(Task).filter_by(user_id=user.id).all()
+    
+    tasks_data = []
+    for task in tasks:
+        tasks_data.append({
+            "id": task.id,
+            "title": task.title,
+            "description": task.description,
+            "status": task.status,
+        })
+    
+    return jsonify({
+        "tasks": tasks_data,
+        "count": len(tasks_data)
+    }), 200
+@task_bp.route('/api/tasks', methods=['POST'])
+@jwt_required()
+def api_add_task():
+    """JSON API endpoint to add a new task"""
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json"}), 400
+    
+    current_user = get_jwt_identity()
+    db_session = get_db_session()
+    
+    user = db_session.query(User).filter_by(username=current_user).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    data = request.get_json()
+    
+    if not data or not data.get('title'):
+        return jsonify({"error": "Title is required"}), 400
+    
+    task = Task(
+        title=data.get('title'),
+        description=data.get('description', ''),
+        status=data.get('status', 'pending'),
+        user_id=user.id
+    )
+    
+    db_session.add(task)
+    db_session.commit()
+    
+    return jsonify({
+        "message": "Task created successfully",
+        "task": {
+            "id": task.id,
+            "title": task.title,
+            "description": task.description,
+            "status": task.status
+        }
+    }), 201
+
+@task_bp.route('/api/tasks/<int:task_id>', methods=['PUT'])
+@jwt_required()
+def api_update_task(task_id):
+    """JSON API endpoint to update a task"""
+    if not request.is_json:
+        return jsonify({"error": "Content-Type must be application/json"}), 400
+    
+    current_user = get_jwt_identity()
+    db_session = get_db_session()
+    
+    user = db_session.query(User).filter_by(username=current_user).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    task = db_session.query(Task).filter_by(id=task_id, user_id=user.id).first()
+    if not task:
+        return jsonify({"error": "Task not found"}), 404
+    
+    data = request.get_json()
+    
+    # Update task fields if provided
+    if 'title' in data:
+        task.title = data['title']
+    if 'description' in data:
+        task.description = data['description']
+    if 'status' in data:
+        task.status = data['status']
+    
+    db_session.commit()
+    
+    return jsonify({
+        "message": "Task updated successfully",
+        "task": {
+            "id": task.id,
+            "title": task.title,
+            "description": task.description,
+            "status": task.status
+        }
+    }), 200
+@task_bp.route('/api/tasks/<int:task_id>', methods=['DELETE'])
+@jwt_required()
+def api_delete_task(task_id):
+    """JSON API endpoint to delete a task"""
+    current_user = get_jwt_identity()
+    db_session = get_db_session()
+    
+    user = db_session.query(User).filter_by(username=current_user).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    task = db_session.query(Task).filter_by(id=task_id, user_id=user.id).first()
+    if not task:
+        return jsonify({"error": "Task not found"}), 404
+    
+    db_session.delete(task)
+    db_session.commit()
+    
+    return jsonify({
+        "message": "Task deleted successfully",
+        "deleted_task_id": task_id
+    }), 200
