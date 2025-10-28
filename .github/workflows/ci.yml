@@ -63,7 +63,7 @@ jobs:
     
     - name: Build Docker image
       run: |
-        docker build -t ${{ github.repository }}:latest .
+        docker build -t ${{ github.repository | lower }}:latest .
     
     - name: Run container tests
       run: |
