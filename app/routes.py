@@ -227,37 +227,25 @@ def logout():
 # Add these routes after your existing logout route
 
 
-@auth_bp.route('/clean-all')
+@auth_bp.route('/clean-all', methods=['POST', 'GET'])
 def clean_all():
-    """Clear everything - sessions and JWT tokens"""
-    from flask import session
-    response = make_response(redirect(url_for('auth.login')))
-
-    # Clear session
-    session.clear()
-
-    # Clear JWT cookies
-    unset_jwt_cookies(response)
-
-    # Explicitly remove session cookie
-    response.set_cookie('session', '', expires=0, max_age=0)
-
-    add_message('All cookies and sessions cleared.', 'info')
+    """
+    Clear all JWT cookies from the client.
+    """
+    response = jsonify({"msg": "All JWT cookies cleared successfully."})
+    unset_jwt_cookies(response)  # Removes both access and refresh cookies
     return response
 
 
 @task_bp.route('/debug/auth-check')
+@jwt_required(optional=True)
 def debug_auth_check():
     """Check authentication status"""
-    from flask import session
     current_user = get_jwt_identity()
 
     return jsonify({
         'jwt_identity': current_user,
-        'session_exists': bool(session),
-        'session_keys': list(session.keys()),
         'cookies_present': {
-            'session': 'session' in request.cookies,
             'access_token': 'access_token_cookie' in request.cookies,
             'refresh_token': 'refresh_token_cookie' in request.cookies
         },

@@ -5,7 +5,6 @@
         <div class="card p-4 shadow-sm">
             <h2 class="mb-3">Login</h2>
             <form method="POST">
-                {{ form.hidden_tag() }}
                 <div class="mb-3">
                     {{ form.username.label(class="form-label") }}
                     {{ form.username(class="form-control", autofocus=True) }}

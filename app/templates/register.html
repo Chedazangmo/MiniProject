@@ -2,7 +2,7 @@
 {% block content %}
 <h2>Register</h2>
 <form method="POST">
-    {{ form.hidden_tag() }}
+    {# Removed hidden_tag() to avoid Flask session #}
     <div>{{ form.username.label }} {{ form.username(class="form-control") }}</div>
     <div>{{ form.password.label }} {{ form.password(class="form-control") }}</div>
     <div>{{ form.confirm_password.label }} {{ form.confirm_password(class="form-control") }}</div>
